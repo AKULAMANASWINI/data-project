@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Engineering @ Microsoft — Career Tracker</title>
+<meta name="description" content="Daily plan, daily schedule and progress tracking on the route to a data engineering role at Microsoft.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📊</text></svg>">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <p class="eyebrow">Career track</p>
+        <h1>Data &amp; AI Engineering → Microsoft</h1>
+        <p class="muted small" id="header-progress-label"></p>
+        <div class="progress-rail"><div class="progress-fill" id="header-progress-fill"></div></div>
+      </div>
+      <div class="topbar-right">
+        <div class="countdown">
+          <span class="countdown-value" id="countdown-days">—</span>
+          <span class="muted small" id="countdown-sub"></span>
+        </div>
+        <span class="pill" id="header-streak"></span>
+        <button class="btn ghost small-btn" id="theme-toggle">◐ Auto</button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab is-active" data-view="today">Today</button>
+      <button class="tab" data-view="week">Week</button>
+      <button class="tab" data-view="roadmap">Roadmap</button>
+      <button class="tab" data-view="progress">Progress</button>
+      <button class="tab" data-view="skills">Skills</button>
+      <button class="tab" data-view="data">Data</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-today" class="view"></section>
+    <section id="view-week" class="view" hidden></section>
+    <section id="view-roadmap" class="view" hidden></section>
+    <section id="view-progress" class="view" hidden></section>
+    <section id="view-skills" class="view" hidden></section>
+    <section id="view-data" class="view" hidden></section>
+  </main>
+
+  <footer class="foot">
+    <p class="muted small">Progress is stored in this browser only. Export a backup from the Data tab.</p>
+  </footer>
+
+  <div id="tooltip" class="tooltip" hidden role="status"></div>
+  <div id="toast" class="toast" hidden role="status"></div>
+
+  <script src="assets/roadmap.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
