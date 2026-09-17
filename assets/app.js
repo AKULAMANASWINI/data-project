@@ -73,21 +73,31 @@ let state = loadState();
 let selectedDate = todayISO();
 let activeView = 'today';
 
+function loadStateFrom(parsed) {
+  const blank = {
+    v: 1, days: {}, skills: {}, board: [], boardSeeded: false,
+    stories: [], mistakes: [], mocks: [], apps: [], theme: 'auto',
+  };
+  const list = (v) => (Array.isArray(v) ? v : []);
+  return {
+    ...blank,
+    ...parsed,
+    days: parsed.days || {},
+    skills: parsed.skills || {},
+    board: list(parsed.board),
+    stories: list(parsed.stories),
+    mistakes: list(parsed.mistakes),
+    mocks: list(parsed.mocks),
+    apps: list(parsed.apps),
+  };
+}
+
 function loadState() {
-  const blank = { v: 1, days: {}, skills: {}, board: [], boardSeeded: false, theme: 'auto' };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return blank;
-    const parsed = JSON.parse(raw);
-    return {
-      ...blank,
-      ...parsed,
-      days: parsed.days || {},
-      skills: parsed.skills || {},
-      board: Array.isArray(parsed.board) ? parsed.board : [],
-    };
+    return loadStateFrom(raw ? JSON.parse(raw) : {});
   } catch {
-    return blank;
+    return loadStateFrom({});
   }
 }
 
@@ -674,6 +684,74 @@ function renderSkills() {
   root.append(card);
 }
 
+/* ---------- reusable record dialog ---------- */
+
+let formSave = null;
+let formDelete = null;
+
+function openForm({ title, fields, values = {}, onSave, onDelete }) {
+  const wrap = $('#form-dialog-fields');
+  wrap.innerHTML = '';
+  $('#form-dialog-title').textContent = title;
+
+  fields.forEach((f) => {
+    const label = el('label', `field${f.full || f.type === 'textarea' ? ' full' : ''}`, f.label);
+    let input;
+    if (f.type === 'textarea') {
+      input = el('textarea', 'note-input');
+      input.rows = f.rows || 3;
+    } else if (f.type === 'select') {
+      input = el('select', 'date-input');
+      f.options.forEach((o) => {
+        const value = typeof o === 'string' ? o : o.value;
+        const text = typeof o === 'string' ? o : o.label;
+        const opt = el('option', null, text);
+        opt.value = value;
+        input.append(opt);
+      });
+    } else {
+      input = el('input', 'date-input');
+      input.type = f.type || 'text';
+      if (f.type === 'number') { input.min = f.min ?? 0; input.max = f.max ?? 100; }
+    }
+    input.dataset.key = f.key;
+    if (f.placeholder) input.placeholder = f.placeholder;
+    if (f.required) input.required = true;
+    if (f.maxlength) input.maxLength = f.maxlength;
+    const val = values[f.key];
+    input.value = val === undefined || val === null ? (f.default ?? '') : val;
+    label.append(input);
+    wrap.append(label);
+  });
+
+  formSave = () => {
+    const out = {};
+    wrap.querySelectorAll('[data-key]').forEach((node) => {
+      out[node.dataset.key] = typeof node.value === 'string' ? node.value.trim() : node.value;
+    });
+    onSave(out);
+  };
+  formDelete = onDelete || null;
+  $('#form-delete').hidden = !onDelete;
+  $('#form-dialog').showModal();
+  wrap.querySelector('input, textarea, select')?.focus();
+}
+
+const newId = () => `r${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
+
+// Only http(s) links become anchors — anything else stays inert text.
+const safeUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : null);
+
+function linkOrText(url, text) {
+  const href = safeUrl(url);
+  if (!href) return el('span', null, text);
+  const a = el('a', null, text);
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  return a;
+}
+
 /* ---------- board ---------- */
 
 const COLUMNS = [
@@ -686,7 +764,6 @@ const COLUMNS = [
 const CARD_TYPES = ['epic', 'story', 'task'];
 
 let boardFilter = 'all';
-let editingCardId = null;
 
 const epicOptions = () => [
   ...PLAN.phases.map((p, i) => ({ id: p.id, name: p.name, slot: i + 1 })),
@@ -828,73 +905,484 @@ function moveCard(id, status) {
 }
 
 function openCard(id, presetStatus) {
-  editingCardId = id;
   const item = id ? state.board.find((c) => c.id === id) : null;
-  const dlg = $('#card-dialog');
-  $('#card-dialog-title').textContent = item ? 'Edit card' : 'New card';
-  $('#card-title').value = item ? item.title : '';
-  $('#card-note').value = item ? item.note || '' : '';
-
-  const typeSel = $('#card-type');
-  typeSel.innerHTML = '';
-  CARD_TYPES.forEach((t) => {
-    const opt = el('option', null, t);
-    opt.value = t;
-    typeSel.append(opt);
-  });
-  typeSel.value = item ? item.type : 'task';
-
-  const epicSel = $('#card-epic');
-  epicSel.innerHTML = '';
-  epicOptions().forEach((e) => {
-    const opt = el('option', null, e.name);
-    opt.value = e.id;
-    epicSel.append(opt);
-  });
   const currentPhase = phaseForWeek(Math.max(0, weekIndexOf(new Date()))).phase;
-  epicSel.value = item ? item.epic : currentPhase.id;
-
-  const statusSel = $('#card-status');
-  statusSel.innerHTML = '';
-  COLUMNS.forEach((c) => {
-    const opt = el('option', null, c.name);
-    opt.value = c.id;
-    statusSel.append(opt);
+  openForm({
+    title: item ? 'Edit card' : 'New card',
+    fields: [
+      { key: 'title', label: 'Title', full: true, required: true, maxlength: 120, placeholder: 'e.g. Build the SCD-2 customer dimension' },
+      { key: 'type', label: 'Type', type: 'select', options: CARD_TYPES, default: 'task' },
+      { key: 'epic', label: 'Epic', type: 'select', options: epicOptions().map((e) => ({ value: e.id, label: e.name })), default: currentPhase.id },
+      { key: 'status', label: 'Column', type: 'select', options: COLUMNS.map((c) => ({ value: c.id, label: c.name })), default: presetStatus || 'backlog' },
+      { key: 'note', label: 'Notes', type: 'textarea', placeholder: 'Acceptance criteria, blockers, links' },
+    ],
+    values: item || {},
+    onSave: (vals) => {
+      if (!vals.title) return;
+      if (item) Object.assign(item, vals);
+      else state.board.push({ id: newId(), created: todayISO(), order: Date.now(), ...vals });
+      saveState();
+      renderBoard();
+    },
+    onDelete: item ? () => {
+      state.board = state.board.filter((c) => c.id !== item.id);
+      saveState();
+      renderBoard();
+      toast('Card deleted.');
+    } : null,
   });
-  statusSel.value = item ? item.status : (presetStatus || 'backlog');
-
-  $('#card-delete').hidden = !item;
-  dlg.showModal();
-  $('#card-title').focus();
 }
 
-function saveCard() {
-  const title = $('#card-title').value.trim();
-  if (!title) return;
-  const fields = {
-    title,
-    type: $('#card-type').value,
-    epic: $('#card-epic').value,
-    status: $('#card-status').value,
-    note: $('#card-note').value.trim(),
+/* ---------- journal ---------- */
+
+let journalQuery = '';
+let journalPhase = 'all';
+
+function renderJournal() {
+  const root = $('#view-journal');
+  root.innerHTML = '';
+
+  const entries = Object.entries(state.days)
+    .filter(([, rec]) => rec.note && rec.note.trim())
+    .map(([dateStr, rec]) => {
+      const plan = buildDay(dateStr);
+      return { dateStr, note: rec.note, phase: plan.phase, focus: plan.focus };
+    })
+    .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+
+  const q = journalQuery.toLowerCase();
+  const shown = entries.filter((e) => {
+    const matchesPhase = journalPhase === 'all' || e.phase.id === journalPhase;
+    const matchesText = !q || e.note.toLowerCase().includes(q) || e.focus.toLowerCase().includes(q);
+    return matchesPhase && matchesText;
+  });
+
+  const head = el('div', 'card board-head');
+  const left = el('div');
+  left.append(el('h2', null, 'Journal'));
+  left.append(el('p', 'muted', 'Every progress-log entry you have written, newest first. Search it before an interview — this is where "tell me about a time you debugged something hard" comes from.'));
+  head.append(left);
+
+  const controls = el('div', 'board-controls');
+  const search = el('input', 'date-input');
+  search.type = 'search';
+  search.placeholder = 'Search entries…';
+  search.value = journalQuery;
+  search.setAttribute('aria-label', 'Search journal');
+  let timer;
+  search.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      journalQuery = search.value;
+      renderJournal();
+      $('#view-journal input[type="search"]').focus();
+    }, 250);
   };
-  const existing = editingCardId ? state.board.find((c) => c.id === editingCardId) : null;
-  if (existing) {
-    Object.assign(existing, fields);
-  } else {
-    state.board.push({ id: `c${Date.now()}`, created: todayISO(), order: Date.now(), ...fields });
+  const phaseSel = el('select', 'date-input');
+  phaseSel.setAttribute('aria-label', 'Filter by phase');
+  const all = el('option', null, 'All phases');
+  all.value = 'all';
+  phaseSel.append(all);
+  PLAN.phases.forEach((p) => {
+    const opt = el('option', null, p.name);
+    opt.value = p.id;
+    phaseSel.append(opt);
+  });
+  phaseSel.value = journalPhase;
+  phaseSel.onchange = () => { journalPhase = phaseSel.value; renderJournal(); };
+  controls.append(search, phaseSel);
+  head.append(controls);
+  root.append(head);
+
+  const list = el('div', 'card');
+  list.append(el('p', 'muted small', `${shown.length} of ${entries.length} entries`));
+  if (!shown.length) {
+    list.append(el('p', 'muted', entries.length
+      ? 'Nothing matches that search.'
+      : 'No entries yet. Write one line at the end of today\'s session — in a year this is the most valuable thing in the app.'));
   }
-  saveState();
-  editingCardId = null;
-  renderBoard();
+  shown.forEach((e) => {
+    const item = el('div', 'journal-item');
+    const top = el('div', 'journal-top');
+    const date = el('button', 'journal-date', fmtLong(parseISO(e.dateStr)));
+    date.onclick = () => { selectedDate = e.dateStr; setView('today'); };
+    top.append(date, el('span', 'pill', e.phase.name));
+    item.append(top);
+    item.append(el('p', 'muted small', e.focus));
+    item.append(el('p', 'journal-note', e.note));
+    list.append(item);
+  });
+  root.append(list);
 }
 
-function deleteCard() {
-  state.board = state.board.filter((c) => c.id !== editingCardId);
-  saveState();
-  editingCardId = null;
-  renderBoard();
-  toast('Card deleted.');
+/* ---------- vault ---------- */
+
+const STORY_THEMES = ['Impact', 'Conflict', 'Failure', 'Ambiguity', 'Collaboration', 'Leadership', 'Technical depth', 'Customer focus'];
+const MISTAKE_AREAS = ['SQL', 'Python / DSA', 'Spark', 'Azure / Fabric', 'Data modeling', 'System design', 'Behavioral', 'Other'];
+const MOCK_TYPES = ['SQL', 'Coding / DSA', 'System design', 'Data modeling', 'Behavioral', 'Full loop'];
+const VAULT_SECTIONS = [
+  { id: 'stories', name: 'STAR stories' },
+  { id: 'mistakes', name: 'Mistakes log' },
+  { id: 'mocks', name: 'Mock interviews' },
+];
+
+let vaultSection = 'stories';
+
+function renderVault() {
+  const root = $('#view-vault');
+  root.innerHTML = '';
+
+  const head = el('div', 'card board-head');
+  const left = el('div');
+  left.append(el('h2', null, 'Interview vault'));
+  left.append(el('p', 'muted', 'The output of your Friday drills and Sunday retros, kept somewhere you can revise from. Stories to tell, mistakes to re-solve, mocks to measure.'));
+  const seg = el('div', 'segmented');
+  VAULT_SECTIONS.forEach((s) => {
+    const btn = el('button', `seg-btn${vaultSection === s.id ? ' is-active' : ''}`, s.name);
+    btn.onclick = () => { vaultSection = s.id; renderVault(); };
+    seg.append(btn);
+  });
+  left.append(seg);
+  head.append(left);
+
+  const addBtn = el('button', 'btn primary', `+ New ${vaultSection === 'stories' ? 'story' : vaultSection === 'mistakes' ? 'mistake' : 'mock'}`);
+  addBtn.onclick = () => {
+    if (vaultSection === 'stories') openStory(null);
+    else if (vaultSection === 'mistakes') openMistake(null);
+    else openMock(null);
+  };
+  head.append(addBtn);
+  root.append(head);
+
+  if (vaultSection === 'stories') renderStories(root);
+  if (vaultSection === 'mistakes') renderMistakes(root);
+  if (vaultSection === 'mocks') renderMocks(root);
+}
+
+function renderStories(root) {
+  const card = el('div', 'card');
+  if (!state.stories.length) {
+    card.append(el('p', 'muted', 'No stories yet. Sunday\'s retro asks for one STAR story a week — 30 by the time you interview. Situation, Task, Action, Result, and put numbers in the result.'));
+  }
+  state.stories.slice().sort((a, b) => (b.created || '').localeCompare(a.created || '')).forEach((s) => {
+    const item = el('details', 'story');
+    const summary = el('summary', 'story-summary');
+    summary.append(el('span', 'story-title', s.title), el('span', 'pill', s.theme || 'Impact'));
+    item.append(summary);
+    [['Situation', s.situation], ['Task', s.task], ['Action', s.action], ['Result', s.result]].forEach(([label, text]) => {
+      if (!text) return;
+      const block = el('div', 'star-block');
+      block.append(el('p', 'eyebrow', label), el('p', null, text));
+      item.append(block);
+    });
+    const edit = el('button', 'btn ghost small-btn', 'Edit');
+    edit.onclick = () => openStory(s.id);
+    item.append(edit);
+    card.append(item);
+  });
+  root.append(card);
+}
+
+function openStory(id) {
+  const item = id ? state.stories.find((s) => s.id === id) : null;
+  openForm({
+    title: item ? 'Edit story' : 'New STAR story',
+    fields: [
+      { key: 'title', label: 'Title', full: true, required: true, maxlength: 120, placeholder: 'e.g. Cut the nightly load from 6h to 40min' },
+      { key: 'theme', label: 'Theme', type: 'select', options: STORY_THEMES, full: true },
+      { key: 'situation', label: 'Situation — the context', type: 'textarea' },
+      { key: 'task', label: 'Task — what you owned', type: 'textarea' },
+      { key: 'action', label: 'Action — what you actually did', type: 'textarea' },
+      { key: 'result', label: 'Result — with numbers', type: 'textarea' },
+    ],
+    values: item || {},
+    onSave: (vals) => {
+      if (!vals.title) return;
+      if (item) Object.assign(item, vals);
+      else state.stories.push({ id: newId(), created: todayISO(), ...vals });
+      saveState();
+      renderVault();
+    },
+    onDelete: item ? () => {
+      state.stories = state.stories.filter((s) => s.id !== item.id);
+      saveState();
+      renderVault();
+      toast('Story deleted.');
+    } : null,
+  });
+}
+
+function renderMistakes(root) {
+  const open = state.mistakes.filter((m) => m.status !== 'resolved');
+  const done = state.mistakes.filter((m) => m.status === 'resolved');
+
+  const card = el('div', 'card');
+  if (!state.mistakes.length) {
+    card.append(el('p', 'muted', 'Nothing logged. Every timed drill that goes wrong belongs here with the correction — re-solving these from scratch is what moves your pass rate.'));
+  }
+  if (open.length) card.append(el('p', 'eyebrow', `Open — ${open.length}`));
+  open.sort((a, b) => (a.reviewOn || '9999').localeCompare(b.reviewOn || '9999')).forEach((m) => card.append(mistakeRow(m)));
+  if (done.length) {
+    card.append(el('p', 'eyebrow', `Re-solved — ${done.length}`));
+    done.slice().reverse().forEach((m) => card.append(mistakeRow(m)));
+  }
+  root.append(card);
+}
+
+function mistakeRow(m) {
+  const row = el('div', `mistake${m.status === 'resolved' ? ' is-resolved' : ''}`);
+  const top = el('div', 'mistake-top');
+  const title = el('button', 'mistake-title', m.title);
+  title.onclick = () => openMistake(m.id);
+  top.append(title, el('span', 'pill', m.area || 'Other'));
+  const overdue = m.status !== 'resolved' && m.reviewOn && daysBetween(parseISO(m.reviewOn), new Date()) >= 0;
+  if (m.reviewOn) {
+    const due = el('span', `due${overdue ? ' is-overdue' : ''}`, `${overdue ? 'Re-solve due ' : 'Re-solve '}${fmtShort(parseISO(m.reviewOn))}`);
+    top.append(due);
+  }
+  row.append(top);
+  if (m.wrong) row.append(el('p', 'mistake-line', `Got wrong: ${m.wrong}`));
+  if (m.fix) row.append(el('p', 'mistake-line', `Correction: ${m.fix}`));
+  const toggle = el('button', 'btn ghost small-btn', m.status === 'resolved' ? 'Reopen' : 'Mark re-solved');
+  toggle.onclick = () => {
+    m.status = m.status === 'resolved' ? 'open' : 'resolved';
+    saveState();
+    renderVault();
+  };
+  row.append(toggle);
+  return row;
+}
+
+function openMistake(id) {
+  const item = id ? state.mistakes.find((m) => m.id === id) : null;
+  openForm({
+    title: item ? 'Edit mistake' : 'Log a mistake',
+    fields: [
+      { key: 'title', label: 'Problem', full: true, required: true, maxlength: 140, placeholder: 'e.g. Gaps and islands — consecutive login streaks' },
+      { key: 'area', label: 'Area', type: 'select', options: MISTAKE_AREAS },
+      { key: 'reviewOn', label: 'Re-solve on', type: 'date', default: iso(addDays(new Date(), 7)) },
+      { key: 'wrong', label: 'What you got wrong', type: 'textarea' },
+      { key: 'fix', label: 'The correction', type: 'textarea' },
+      { key: 'status', label: 'Status', type: 'select', options: [{ value: 'open', label: 'Open' }, { value: 'resolved', label: 'Re-solved' }], default: 'open' },
+    ],
+    values: item || {},
+    onSave: (vals) => {
+      if (!vals.title) return;
+      if (item) Object.assign(item, vals);
+      else state.mistakes.push({ id: newId(), created: todayISO(), ...vals });
+      saveState();
+      renderVault();
+    },
+    onDelete: item ? () => {
+      state.mistakes = state.mistakes.filter((m) => m.id !== item.id);
+      saveState();
+      renderVault();
+      toast('Entry deleted.');
+    } : null,
+  });
+}
+
+function renderMocks(root) {
+  const mocks = state.mocks.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  if (mocks.length) {
+    const chartCard = el('div', 'card');
+    chartCard.append(el('h3', null, 'Scores over time'));
+    chartCard.append(el('p', 'muted small', 'Each bar is one mock, oldest first. Self-graded 1–5; what matters is the direction.'));
+    const chart = el('div', 'bar-chart');
+    const plot = el('div', 'bar-plot');
+    [0.6, 1].forEach((frac) => {
+      const line = el('div', 'grid-line');
+      line.style.bottom = `${frac * 100}%`;
+      line.dataset.label = `${(5 * frac).toFixed(0)}/5`;
+      plot.append(line);
+    });
+    mocks.slice(-16).forEach((m) => {
+      const col = el('div', 'bar-col');
+      const bar = el('div', 'bar');
+      bar.style.height = `${Math.max(2, (Number(m.score || 0) / 5) * 100)}%`;
+      const tip = `<strong>${m.date ? fmtLong(parseISO(m.date)) : 'No date'}</strong><br>${m.type || ''} — ${m.score || '?'}/5${m.source ? `<br>${m.source}` : ''}`;
+      col.onmousemove = (e) => showTip(e, tip);
+      col.onmouseleave = hideTip;
+      col.append(bar, el('p', 'bar-label', m.date ? fmtShort(parseISO(m.date)) : '—'));
+      plot.append(col);
+    });
+    chart.append(plot);
+    chartCard.append(chart);
+    root.append(chartCard);
+  }
+
+  const card = el('div', 'card');
+  if (!mocks.length) {
+    card.append(el('p', 'muted', 'No mocks logged. From Phase 6 you run these weekly — log the score and the three fixes each time, or the feedback evaporates.'));
+  }
+  mocks.slice().reverse().forEach((m) => {
+    const row = el('div', 'mock');
+    const top = el('div', 'mistake-top');
+    const title = el('button', 'mistake-title', `${m.type || 'Mock'} — ${m.score || '?'}/5`);
+    title.onclick = () => openMock(m.id);
+    top.append(title);
+    if (m.date) top.append(el('span', 'pill', fmtShort(parseISO(m.date))));
+    if (m.source) top.append(el('span', 'muted small', m.source));
+    row.append(top);
+    if (m.feedback) row.append(el('p', 'mistake-line', `Feedback: ${m.feedback}`));
+    if (m.fixes) row.append(el('p', 'mistake-line', `Fixes: ${m.fixes}`));
+    card.append(row);
+  });
+  root.append(card);
+}
+
+function openMock(id) {
+  const item = id ? state.mocks.find((m) => m.id === id) : null;
+  openForm({
+    title: item ? 'Edit mock' : 'Log a mock interview',
+    fields: [
+      { key: 'date', label: 'Date', type: 'date', default: todayISO() },
+      { key: 'type', label: 'Round', type: 'select', options: MOCK_TYPES },
+      { key: 'score', label: 'Score (1–5)', type: 'select', options: ['1', '2', '3', '4', '5'], default: '3' },
+      { key: 'source', label: 'With whom', placeholder: 'Peer, mentor, AI interviewer' },
+      { key: 'feedback', label: 'Feedback', type: 'textarea' },
+      { key: 'fixes', label: 'Three fixes before the next one', type: 'textarea' },
+    ],
+    values: item || {},
+    onSave: (vals) => {
+      if (item) Object.assign(item, vals);
+      else state.mocks.push({ id: newId(), created: todayISO(), ...vals });
+      saveState();
+      renderVault();
+    },
+    onDelete: item ? () => {
+      state.mocks = state.mocks.filter((m) => m.id !== item.id);
+      saveState();
+      renderVault();
+      toast('Mock deleted.');
+    } : null,
+  });
+}
+
+/* ---------- applications ---------- */
+
+const STAGES = [
+  { id: 'researching', name: 'Researching' },
+  { id: 'applied', name: 'Applied' },
+  { id: 'recruiter', name: 'Recruiter screen' },
+  { id: 'technical', name: 'Technical screen' },
+  { id: 'loop', name: 'Onsite loop' },
+  { id: 'offer', name: 'Offer' },
+  { id: 'rejected', name: 'Rejected' },
+  { id: 'withdrawn', name: 'Withdrawn' },
+];
+const CLOSED_STAGES = ['rejected', 'withdrawn'];
+const INTERVIEW_STAGES = ['recruiter', 'technical', 'loop', 'offer'];
+const stageName = (id) => (STAGES.find((s) => s.id === id) || STAGES[0]).name;
+
+function renderApps(root = $('#view-apps')) {
+  root.innerHTML = '';
+  const apps = state.apps;
+
+  const head = el('div', 'card board-head');
+  const left = el('div');
+  left.append(el('h2', null, 'Applications'));
+  left.append(el('p', 'muted', 'Every role you apply to, with the next action and who referred you. The conversion rates tell you what to fix: lots of applications and no screens is a resume problem, not a volume problem.'));
+  head.append(left);
+  const addBtn = el('button', 'btn primary', '+ New application');
+  addBtn.onclick = () => openApp(null);
+  head.append(addBtn);
+  root.append(head);
+
+  const applied = apps.filter((a) => a.stage !== 'researching');
+  const reached = apps.filter((a) => INTERVIEW_STAGES.includes(a.stage));
+  const offers = apps.filter((a) => a.stage === 'offer');
+  const active = apps.filter((a) => !CLOSED_STAGES.includes(a.stage));
+  const tiles = el('div', 'tile-row');
+  tiles.append(tile('Applications', String(applied.length), `${apps.length} tracked in total`));
+  tiles.append(tile('Active', String(active.length), 'not rejected or withdrawn'));
+  tiles.append(tile('Reached a screen', String(reached.length), applied.length ? `${Math.round((reached.length / applied.length) * 100)}% of applications` : 'none yet'));
+  tiles.append(tile('Offers', String(offers.length), offers.length ? 'nice work' : 'the one that counts'));
+  root.append(tiles);
+
+  const card = el('div', 'card');
+  if (!apps.length) {
+    card.append(el('p', 'muted', 'Nothing tracked yet. Worth starting early: add Microsoft teams you want to land in as "Researching", so by the time you apply you already know who does what.'));
+    root.append(card);
+    return;
+  }
+
+  const table = el('table', 'data-table app-table');
+  table.innerHTML = '<thead><tr><th>Role</th><th>Stage</th><th>Applied</th><th>Next action</th><th>Referral</th></tr></thead>';
+  const tbody = el('tbody');
+  const order = (a) => (CLOSED_STAGES.includes(a.stage) ? 1 : 0);
+  apps.slice().sort((a, b) => order(a) - order(b)
+    || (a.nextActionOn || '9999').localeCompare(b.nextActionOn || '9999')
+    || (b.appliedOn || '').localeCompare(a.appliedOn || '')).forEach((a) => {
+    const tr = el('tr', 'app-row');
+    const roleCell = el('td');
+    const name = el('button', 'app-name', `${a.company}${a.role ? ` — ${a.role}` : ''}`);
+    name.onclick = () => openApp(a.id);
+    roleCell.append(name);
+    const href = safeUrl(a.link);
+    if (a.reqId || href) {
+      const meta = el('p', 'muted small', '');
+      const label = a.reqId ? `Req ${a.reqId}` : 'Job posting';
+      meta.append(href ? linkOrText(href, label) : el('span', null, label));
+      roleCell.append(meta);
+    }
+    tr.append(roleCell);
+
+    const stageCell = el('td');
+    stageCell.append(el('span', `stage stage-${a.stage}`, stageName(a.stage)));
+    tr.append(stageCell);
+    tr.append(el('td', null, a.appliedOn ? fmtShort(parseISO(a.appliedOn)) : '—'));
+
+    const nextCell = el('td');
+    if (a.nextAction) {
+      const overdue = a.nextActionOn && !CLOSED_STAGES.includes(a.stage) && daysBetween(parseISO(a.nextActionOn), new Date()) >= 0;
+      const text = el('span', overdue ? 'due is-overdue' : '', a.nextAction);
+      nextCell.append(text);
+      if (a.nextActionOn) nextCell.append(el('p', 'muted small', fmtShort(parseISO(a.nextActionOn))));
+    } else {
+      nextCell.append(el('span', 'muted', '—'));
+    }
+    tr.append(nextCell);
+    tr.append(el('td', null, a.referral || '—'));
+    tbody.append(tr);
+  });
+  table.append(tbody);
+  card.append(table);
+  root.append(card);
+}
+
+function openApp(id) {
+  const item = id ? state.apps.find((a) => a.id === id) : null;
+  openForm({
+    title: item ? 'Edit application' : 'New application',
+    fields: [
+      { key: 'company', label: 'Company', required: true, maxlength: 80, placeholder: 'Microsoft' },
+      { key: 'role', label: 'Role', maxlength: 120, placeholder: 'Data Engineer II, Azure Data' },
+      { key: 'reqId', label: 'Req ID', maxlength: 40 },
+      { key: 'link', label: 'Job posting URL', placeholder: 'https://…' },
+      { key: 'stage', label: 'Stage', type: 'select', options: STAGES.map((s) => ({ value: s.id, label: s.name })), default: 'applied' },
+      { key: 'appliedOn', label: 'Applied on', type: 'date', default: todayISO() },
+      { key: 'referral', label: 'Referral / source', maxlength: 80, placeholder: 'Who referred you, or where you found it' },
+      { key: 'nextAction', label: 'Next action', maxlength: 120, placeholder: 'Follow up with recruiter' },
+      { key: 'nextActionOn', label: 'Next action on', type: 'date' },
+      { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Questions asked, names, comp discussion' },
+    ],
+    values: item || {},
+    onSave: (vals) => {
+      if (!vals.company) return;
+      if (item) Object.assign(item, vals);
+      else state.apps.push({ id: newId(), created: todayISO(), ...vals });
+      saveState();
+      renderApps();
+    },
+    onDelete: item ? () => {
+      state.apps = state.apps.filter((a) => a.id !== item.id);
+      saveState();
+      renderApps();
+      toast('Application deleted.');
+    } : null,
+  });
 }
 
 /* ---------- data view ---------- */
@@ -931,7 +1419,9 @@ function renderData() {
       try {
         const parsed = JSON.parse(reader.result);
         if (!parsed || typeof parsed !== 'object' || !parsed.days) throw new Error('bad file');
-        state = { v: 1, theme: state.theme, days: parsed.days || {}, skills: parsed.skills || {} };
+        const theme = state.theme;
+        state = loadStateFrom(parsed);
+        state.theme = theme;
         saveState();
         render();
         toast('Backup restored.');
@@ -946,8 +1436,10 @@ function renderData() {
 
   const resetBtn = el('button', 'btn danger', 'Reset all progress');
   resetBtn.onclick = () => {
-    if (confirm('Delete all logged days, notes and skill ratings? Export a backup first if you want to keep them.')) {
-      state = { v: 1, days: {}, skills: {}, theme: state.theme };
+    if (confirm('Delete everything — logged days, notes, skill ratings, board cards, stories, mistakes, mocks and applications? Export a backup first if you want to keep them.')) {
+      const theme = state.theme;
+      state = loadStateFrom({});
+      state.theme = theme;
       saveState();
       render();
       toast('Progress cleared.');
@@ -957,7 +1449,7 @@ function renderData() {
   card.append(row);
 
   const stats = overallStats();
-  card.append(el('p', 'muted small', `Stored: ${Object.keys(state.days).length} days, ${stats.tasksDone} completed blocks, ${Object.keys(state.skills).length} skill ratings.`));
+  card.append(el('p', 'muted small', `Stored: ${Object.keys(state.days).length} days, ${stats.tasksDone} completed blocks, ${state.board.length} board cards, ${state.stories.length} stories, ${state.mistakes.length} mistakes, ${state.mocks.length} mocks, ${state.apps.length} applications.`));
   root.append(card);
 
   const how = el('div', 'card');
@@ -976,7 +1468,7 @@ function renderData() {
 
 /* ---------- views & theme ---------- */
 
-const VIEWS = ['today', 'week', 'board', 'roadmap', 'progress', 'skills', 'data'];
+const VIEWS = ['today', 'week', 'board', 'journal', 'vault', 'apps', 'roadmap', 'progress', 'skills', 'data'];
 
 function setView(view) {
   activeView = view;
@@ -994,6 +1486,9 @@ function render() {
   if (activeView === 'today') renderToday();
   if (activeView === 'week') renderWeek();
   if (activeView === 'board') renderBoard();
+  if (activeView === 'journal') renderJournal();
+  if (activeView === 'vault') renderVault();
+  if (activeView === 'apps') renderApps();
   if (activeView === 'roadmap') renderRoadmap();
   if (activeView === 'progress') renderProgress();
   if (activeView === 'skills') renderSkills();
@@ -1016,13 +1511,13 @@ function init() {
     saveState();
     applyTheme();
   };
-  $('#card-form').onsubmit = (e) => {
+  $('#form-dialog-form').onsubmit = (e) => {
     e.preventDefault();
-    saveCard();
-    $('#card-dialog').close();
+    formSave?.();
+    $('#form-dialog').close();
   };
-  $('#card-cancel').onclick = () => { editingCardId = null; $('#card-dialog').close(); };
-  $('#card-delete').onclick = () => { deleteCard(); $('#card-dialog').close(); };
+  $('#form-cancel').onclick = () => $('#form-dialog').close();
+  $('#form-delete').onclick = () => { formDelete?.(); $('#form-dialog').close(); };
 
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea')) return;

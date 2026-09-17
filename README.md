@@ -28,6 +28,9 @@ To have it on your phone and laptop, enable GitHub Pages on this repo
 | **Today** | The day's schedule — 3–4 timed blocks with what to study and what to build, a checklist, a completion ring and a progress log. Arrow keys move between days. |
 | **Week** | All 7 days of the current week at a glance, with completion state. |
 | **Board** | Kanban for epics, stories and tasks across Backlog → This week → In progress → Blocked → Done. Drag cards, or use the arrows on a phone. Filter by epic. Seeded with one epic per phase plus the current phase's project. |
+| **Journal** | Every progress-log entry, newest first, searchable and filterable by phase. Click a date to reopen that day. |
+| **Vault** | Interview material in three sections: STAR stories, a mistakes log with re-solve dates (overdue ones flag red), and mock interviews scored 1–5 with a trend chart. |
+| **Apply** | Job applications: company, role, req, referral, stage, next action with due dates, and conversion tiles (applications → screens → offers). |
 | **Roadmap** | The 7 phases: dates, topics, milestones, primary sources, and how many elapsed days in each you've logged. |
 | **Progress** | Days-to-target, streak, consistency, focused hours, a daily heatmap, hours-per-week chart and your recent log entries. |
 | **Skills** | 17 skills rated 0–5 against the level the role needs. The dashed gap is your interview risk list. |
@@ -68,6 +71,10 @@ list. The dates recompute from `anchorMonday` automatically.
 The Today tab is for what happens in one sitting; the **Board** is for anything spanning days —
 a capstone, a certification, a job application. Its epics are the seven phases, so a card always
 says which part of the plan it serves.
+
+The daily plan produces material — a STAR story on Sundays, a mistakes log on Fridays, mock
+scores from Phase 6, applications from Phase 7. **Vault** and **Apply** are where that lands so
+it is still there months later when you need to revise from it.
 
 ## Where your data lives
 
