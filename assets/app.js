@@ -74,12 +74,18 @@ let selectedDate = todayISO();
 let activeView = 'today';
 
 function loadState() {
-  const blank = { v: 1, days: {}, skills: {}, theme: 'auto' };
+  const blank = { v: 1, days: {}, skills: {}, board: [], boardSeeded: false, theme: 'auto' };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return blank;
     const parsed = JSON.parse(raw);
-    return { ...blank, ...parsed, days: parsed.days || {}, skills: parsed.skills || {} };
+    return {
+      ...blank,
+      ...parsed,
+      days: parsed.days || {},
+      skills: parsed.skills || {},
+      board: Array.isArray(parsed.board) ? parsed.board : [],
+    };
   } catch {
     return blank;
   }
@@ -666,6 +672,229 @@ function renderSkills() {
   root.append(card);
 }
 
+/* ---------- board ---------- */
+
+const COLUMNS = [
+  { id: 'backlog', name: 'Backlog' },
+  { id: 'week', name: 'This week' },
+  { id: 'doing', name: 'In progress' },
+  { id: 'blocked', name: 'Blocked' },
+  { id: 'done', name: 'Done' },
+];
+const CARD_TYPES = ['epic', 'story', 'task'];
+
+let boardFilter = 'all';
+let editingCardId = null;
+
+const epicOptions = () => [
+  ...PLAN.phases.map((p, i) => ({ id: p.id, name: p.name, slot: i + 1 })),
+  { id: 'general', name: 'General', slot: 8 },
+];
+const epicById = (id) => epicOptions().find((e) => e.id === id) || epicOptions()[epicOptions().length - 1];
+
+function seedBoard() {
+  if (state.boardSeeded) return;
+  const currentWeek = Math.max(0, weekIndexOf(new Date()));
+  const { phase: currentPhase } = phaseForWeek(currentWeek);
+  const cards = PLAN.phases.map((phase, i) => ({
+    id: `seed-${phase.id}`,
+    title: phase.name,
+    type: 'epic',
+    epic: phase.id,
+    status: phase.id === currentPhase.id ? 'doing' : 'backlog',
+    note: phase.milestone,
+    created: todayISO(),
+    order: i,
+  }));
+  cards.push({
+    id: `seed-${currentPhase.id}-project`,
+    title: `Project: ${currentPhase.name}`,
+    type: 'story',
+    epic: currentPhase.id,
+    status: 'week',
+    note: currentPhase.project,
+    created: todayISO(),
+    order: cards.length,
+  });
+  state.board = cards;
+  state.boardSeeded = true;
+  saveState();
+}
+
+function renderBoard() {
+  const root = $('#view-board');
+  root.innerHTML = '';
+  seedBoard();
+
+  const head = el('div', 'card board-head');
+  const left = el('div');
+  left.append(el('h2', null, 'Board'));
+  left.append(el('p', 'muted', 'Epics are the phases, stories are the things you ship, tasks are the next concrete moves. Drag a card between columns, or use the arrows on small screens.'));
+  head.append(left);
+
+  const controls = el('div', 'board-controls');
+  const filter = el('select', 'date-input');
+  filter.setAttribute('aria-label', 'Filter by epic');
+  const optAll = el('option', null, 'All epics');
+  optAll.value = 'all';
+  filter.append(optAll);
+  epicOptions().forEach((e) => {
+    const opt = el('option', null, e.name);
+    opt.value = e.id;
+    filter.append(opt);
+  });
+  filter.value = boardFilter;
+  filter.onchange = () => { boardFilter = filter.value; renderBoard(); };
+  const addBtn = el('button', 'btn primary', '+ New card');
+  addBtn.onclick = () => openCard(null, 'backlog');
+  controls.append(filter, addBtn);
+  head.append(controls);
+  root.append(head);
+
+  const visible = state.board.filter((c) => boardFilter === 'all' || c.epic === boardFilter);
+  const board = el('div', 'board');
+  COLUMNS.forEach((col) => {
+    const column = el('div', 'board-col');
+    const colHead = el('div', 'board-col-head');
+    const items = visible.filter((c) => c.status === col.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    colHead.append(el('span', 'board-col-name', col.name), el('span', 'board-col-count', String(items.length)));
+    column.append(colHead);
+
+    const drop = el('div', 'board-drop');
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('is-over'); };
+    drop.ondragleave = () => drop.classList.remove('is-over');
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.classList.remove('is-over');
+      moveCard(e.dataTransfer.getData('text/plain'), col.id);
+    };
+    items.forEach((item) => drop.append(boardCard(item, col.id)));
+    if (!items.length) drop.append(el('p', 'board-empty', 'Nothing here'));
+    column.append(drop);
+
+    const add = el('button', 'btn ghost small-btn board-add', '+ Add');
+    add.onclick = () => openCard(null, col.id);
+    column.append(add);
+    board.append(column);
+  });
+  root.append(board);
+}
+
+function boardCard(item, colId) {
+  const epic = epicById(item.epic);
+  const card = el('div', `board-card${item.status === 'done' ? ' is-done' : ''}`);
+  card.draggable = true;
+  card.ondragstart = (e) => {
+    e.dataTransfer.setData('text/plain', item.id);
+    card.classList.add('is-dragging');
+  };
+  card.ondragend = () => card.classList.remove('is-dragging');
+
+  const top = el('div', 'board-card-top');
+  const chip = el('span', 'epic-chip', epic.name);
+  chip.style.setProperty('--chip', `var(--epic-${epic.slot})`);
+  top.append(chip, el('span', `type-badge type-${item.type}`, item.type));
+  card.append(top);
+
+  const title = el('button', 'board-card-title', item.title);
+  title.onclick = () => openCard(item.id);
+  card.append(title);
+  if (item.note) card.append(el('p', 'board-card-note', item.note));
+
+  const foot = el('div', 'board-card-foot');
+  const idx = COLUMNS.findIndex((c) => c.id === colId);
+  const left = el('button', 'move-btn', '‹');
+  left.title = 'Move left';
+  left.disabled = idx === 0;
+  left.onclick = () => moveCard(item.id, COLUMNS[idx - 1].id);
+  const right = el('button', 'move-btn', '›');
+  right.title = 'Move right';
+  right.disabled = idx === COLUMNS.length - 1;
+  right.onclick = () => moveCard(item.id, COLUMNS[idx + 1].id);
+  foot.append(left, right);
+  card.append(foot);
+  return card;
+}
+
+function moveCard(id, status) {
+  const item = state.board.find((c) => c.id === id);
+  if (!item || item.status === status) return;
+  item.status = status;
+  item.order = Date.now();
+  saveState();
+  renderBoard();
+}
+
+function openCard(id, presetStatus) {
+  editingCardId = id;
+  const item = id ? state.board.find((c) => c.id === id) : null;
+  const dlg = $('#card-dialog');
+  $('#card-dialog-title').textContent = item ? 'Edit card' : 'New card';
+  $('#card-title').value = item ? item.title : '';
+  $('#card-note').value = item ? item.note || '' : '';
+
+  const typeSel = $('#card-type');
+  typeSel.innerHTML = '';
+  CARD_TYPES.forEach((t) => {
+    const opt = el('option', null, t);
+    opt.value = t;
+    typeSel.append(opt);
+  });
+  typeSel.value = item ? item.type : 'task';
+
+  const epicSel = $('#card-epic');
+  epicSel.innerHTML = '';
+  epicOptions().forEach((e) => {
+    const opt = el('option', null, e.name);
+    opt.value = e.id;
+    epicSel.append(opt);
+  });
+  const currentPhase = phaseForWeek(Math.max(0, weekIndexOf(new Date()))).phase;
+  epicSel.value = item ? item.epic : currentPhase.id;
+
+  const statusSel = $('#card-status');
+  statusSel.innerHTML = '';
+  COLUMNS.forEach((c) => {
+    const opt = el('option', null, c.name);
+    opt.value = c.id;
+    statusSel.append(opt);
+  });
+  statusSel.value = item ? item.status : (presetStatus || 'backlog');
+
+  $('#card-delete').hidden = !item;
+  dlg.showModal();
+  $('#card-title').focus();
+}
+
+function saveCard() {
+  const title = $('#card-title').value.trim();
+  if (!title) return;
+  const fields = {
+    title,
+    type: $('#card-type').value,
+    epic: $('#card-epic').value,
+    status: $('#card-status').value,
+    note: $('#card-note').value.trim(),
+  };
+  const existing = editingCardId ? state.board.find((c) => c.id === editingCardId) : null;
+  if (existing) {
+    Object.assign(existing, fields);
+  } else {
+    state.board.push({ id: `c${Date.now()}`, created: todayISO(), order: Date.now(), ...fields });
+  }
+  saveState();
+  editingCardId = null;
+  renderBoard();
+}
+
+function deleteCard() {
+  state.board = state.board.filter((c) => c.id !== editingCardId);
+  saveState();
+  editingCardId = null;
+  renderBoard();
+  toast('Card deleted.');
+}
+
 /* ---------- data view ---------- */
 
 function renderData() {
@@ -745,7 +974,7 @@ function renderData() {
 
 /* ---------- views & theme ---------- */
 
-const VIEWS = ['today', 'week', 'roadmap', 'progress', 'skills', 'data'];
+const VIEWS = ['today', 'week', 'board', 'roadmap', 'progress', 'skills', 'data'];
 
 function setView(view) {
   activeView = view;
@@ -762,6 +991,7 @@ function render() {
   });
   if (activeView === 'today') renderToday();
   if (activeView === 'week') renderWeek();
+  if (activeView === 'board') renderBoard();
   if (activeView === 'roadmap') renderRoadmap();
   if (activeView === 'progress') renderProgress();
   if (activeView === 'skills') renderSkills();
@@ -784,6 +1014,14 @@ function init() {
     saveState();
     applyTheme();
   };
+  $('#card-form').onsubmit = (e) => {
+    e.preventDefault();
+    saveCard();
+    $('#card-dialog').close();
+  };
+  $('#card-cancel').onclick = () => { editingCardId = null; $('#card-dialog').close(); };
+  $('#card-delete').onclick = () => { deleteCard(); $('#card-dialog').close(); };
+
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea')) return;
     if (e.key === 'ArrowLeft' && activeView === 'today') { selectedDate = iso(addDays(parseISO(selectedDate), -1)); render(); }
