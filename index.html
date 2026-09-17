@@ -30,6 +30,9 @@
       <button class="tab is-active" data-view="today">Today</button>
       <button class="tab" data-view="week">Week</button>
       <button class="tab" data-view="board">Board</button>
+      <button class="tab" data-view="journal">Journal</button>
+      <button class="tab" data-view="vault">Vault</button>
+      <button class="tab" data-view="apps">Apply</button>
       <button class="tab" data-view="roadmap">Roadmap</button>
       <button class="tab" data-view="progress">Progress</button>
       <button class="tab" data-view="skills">Skills</button>
@@ -41,6 +44,9 @@
     <section id="view-today" class="view"></section>
     <section id="view-week" class="view" hidden></section>
     <section id="view-board" class="view" hidden></section>
+    <section id="view-journal" class="view" hidden></section>
+    <section id="view-vault" class="view" hidden></section>
+    <section id="view-apps" class="view" hidden></section>
     <section id="view-roadmap" class="view" hidden></section>
     <section id="view-progress" class="view" hidden></section>
     <section id="view-skills" class="view" hidden></section>
@@ -51,30 +57,14 @@
     <p class="muted small">Progress is stored in this browser only. Export a backup from the Data tab.</p>
   </footer>
 
-  <dialog id="card-dialog" class="dialog">
-    <form id="card-form" class="dialog-form">
-      <h3 id="card-dialog-title">New card</h3>
-      <label class="field">Title
-        <input id="card-title" class="date-input" required maxlength="120" placeholder="e.g. Build the SCD-2 customer dimension">
-      </label>
-      <div class="field-row">
-        <label class="field">Type
-          <select id="card-type" class="date-input"></select>
-        </label>
-        <label class="field">Epic
-          <select id="card-epic" class="date-input"></select>
-        </label>
-        <label class="field">Column
-          <select id="card-status" class="date-input"></select>
-        </label>
-      </div>
-      <label class="field">Notes
-        <textarea id="card-note" class="note-input" rows="3" placeholder="Acceptance criteria, blockers, links"></textarea>
-      </label>
+  <dialog id="form-dialog" class="dialog">
+    <form id="form-dialog-form" class="dialog-form">
+      <h3 id="form-dialog-title"></h3>
+      <div id="form-dialog-fields" class="field-grid"></div>
       <div class="dialog-actions">
-        <button type="button" id="card-delete" class="btn danger">Delete</button>
+        <button type="button" id="form-delete" class="btn danger">Delete</button>
         <span class="spacer"></span>
-        <button type="button" id="card-cancel" class="btn">Cancel</button>
+        <button type="button" id="form-cancel" class="btn">Cancel</button>
         <button type="submit" class="btn primary">Save</button>
       </div>
     </form>
