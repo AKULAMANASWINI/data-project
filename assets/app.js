@@ -294,7 +294,7 @@ function renderToday() {
   list.append(actions);
   root.append(list);
 
-  const notes = el('div', 'card');
+  const notes = el('div', 'card log-card');
   notes.append(el('h3', null, 'Progress log'));
   notes.append(el('p', 'muted small', 'What you actually did, what blocked you, what to carry into tomorrow. This is your interview story material.'));
   const area = el('textarea', 'note-input');
@@ -316,7 +316,7 @@ function renderToday() {
   notes.append(saved);
   root.append(notes);
 
-  const context = el('div', 'card');
+  const context = el('div', 'card context-card');
   context.append(el('h3', null, 'This week in context'));
   const grid = el('div', 'context-grid');
   grid.append(contextCell('Phase', plan.phase.name, plan.phase.subtitle));
@@ -401,6 +401,8 @@ function renderRoadmap() {
   root.append(intro);
 
   const currentWeek = weekIndexOf(new Date());
+  const grid = el('div', 'phase-grid');
+  root.append(grid);
   PLAN.phases.forEach((phase, i) => {
     const { start, end, startWeek } = phaseBounds(i);
     const isCurrent = currentWeek >= startWeek && (phase.weeks === null || currentWeek < startWeek + phase.weeks);
@@ -439,7 +441,7 @@ function renderRoadmap() {
       card.append(bar);
       card.append(el('p', 'muted small', `${stats.done} of ${stats.elapsed} elapsed days logged complete`));
     }
-    root.append(card);
+    grid.append(card);
   });
 }
 
@@ -630,7 +632,7 @@ function renderSkills() {
   head.append(el('p', 'muted small', 'Click a segment to set the level.'));
   root.append(head);
 
-  const card = el('div', 'card');
+  const card = el('div', 'card skill-list');
   PLAN.skills.forEach((skill) => {
     const row = el('div', 'skill-row');
     const top = el('div', 'skill-top');
