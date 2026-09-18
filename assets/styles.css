@@ -645,6 +645,7 @@ main {
   cursor: pointer;
 }
 .heat-cell.is-future { opacity: 0.45; }
+.heat-cell.is-before { background: transparent; border: 1px dashed var(--grid); }
 .heat-cell.is-today { outline: 2px solid var(--ink); outline-offset: 1px; }
 .heat-cell:hover { outline: 2px solid var(--series); outline-offset: 1px; }
 

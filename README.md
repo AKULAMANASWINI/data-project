@@ -4,7 +4,7 @@ A single-page site that turns "get a data engineering job at Microsoft after Dec
 schedule you can actually follow: every day already has a plan, you tick blocks off as you do
 them, and progress accumulates into a streak, a heatmap and a skill matrix.
 
-Start date **16 Sep 2026** · target **1 Dec 2027** — 63 weeks, split into 7 phases.
+Start date **18 Sep 2026** · target **1 Dec 2027** — 63 weeks, split into 7 phases.
 
 ## Run it
 
@@ -42,15 +42,21 @@ Nothing is hardcoded per date. `assets/roadmap.js` defines phases; each phase ho
 topics with a *theory* and a *lab* description. `assets/app.js` works out which phase and week a
 date falls in, picks two topics for that week, and fills a fixed weekly shape:
 
-| Day | Shape |
-|---|---|
-| Mon | SQL warm-up → topic A deep dive → flashcards |
-| Tue | Topic A hands-on lab → commit it → 1 coding problem |
-| Wed | SQL warm-up → topic B deep dive → primary docs |
-| Thu | Topic B lab → written learning note → 1 coding problem |
-| Fri | Timed SQL set + DSA problem + weak-area review |
-| Sat | 3-hour project block on the phase project |
-| Sun | Retro, a STAR story, networking, light reading |
+**Time budget: 5 hours a day Mon–Fri, 8 hours Sat–Sun — 41 hours a week.** Every generated day
+sums to exactly its budget.
+
+| Day | Shape | Budget |
+|---|---|---|
+| Mon | SQL warm-up → topic A deep dive → first pass at the lab → flashcards → 1 timed problem | 5h |
+| Tue | SQL warm-up → topic A lab → commit with tests → 2 timed problems → learning note | 5h |
+| Wed | SQL warm-up → topic B deep dive → primary docs → first pass at the lab → flashcards | 5h |
+| Thu | Topic B lab → commit with tests → 2 timed problems → learning note → flashcards | 5h |
+| Fri | Timed SQL set → DSA set → re-solve the week's mistakes → gap reading → consolidate notes | 5h |
+| Sat | Two project blocks → tests → push and document → 1 timed problem | 8h |
+| Sun | Retro → STAR story → spaced repetition → fill the week's gaps → preview next week → catch-up → networking | 8h |
+
+To change the budget, edit the templates in `assets/roadmap.js`; `WEEKDAY_MINUTES` and
+`WEEKEND_MINUTES` at the top of that section document what each day must sum to.
 
 Later phases swap that shape for project sprints, then interview drills, then applications.
 Weeks are anchored to Mondays, so every phase starts on a Monday and ends with a Sunday retro.
@@ -81,6 +87,11 @@ it is still there months later when you need to revise from it.
 In `localStorage`, in the browser you use — it never leaves your machine, and it does not sync
 between devices or browsers. **Export a backup from the Data tab at the end of each month**, and
 import it after switching browsers.
+
+To restart the plan from scratch, change `startDate` in `assets/roadmap.js` and bump
+`resetToken` alongside it. Every browser clears its stored progress once on the next load, so
+the restart applies everywhere rather than only where you clicked Reset. Imported backups are
+re-stamped with the current token, so restoring one does not trip the wipe.
 
 ## Files
 

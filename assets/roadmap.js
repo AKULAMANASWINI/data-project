@@ -8,10 +8,13 @@
  */
 
 const PLAN = {
-  startDate: '2026-09-16',
+  startDate: '2026-09-18',
   anchorMonday: '2026-09-14',
   targetDate: '2027-12-01',
   targetLabel: 'Microsoft Data Engineer — interview-ready',
+
+  // Bumping this wipes stored progress on next load, for a clean restart.
+  resetToken: '2026-09-18-fresh-start',
 
   levels: ['Not started', 'Aware', 'Beginner', 'Working', 'Proficient', 'Interview-ready'],
 
@@ -439,9 +442,17 @@ const PLAN = {
   ],
 };
 
-/* ---------- daily plan templates ---------- */
+/* ---------- daily plan templates ----------
+ *
+ * Budget: 300 minutes Mon–Fri, 480 minutes Sat–Sun. Every day below sums to
+ * exactly its budget; the budget test in the repo README checks that.
+ */
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const WEEKDAY_MINUTES = 300;
+const WEEKEND_MINUTES = 480;
+const budgetFor = (dow) => (dow === 0 || dow === 6 ? WEEKEND_MINUTES : WEEKDAY_MINUTES);
 
 function t(title, minutes, tag, detail, skill) {
   return { title, minutes, tag, detail: detail || '', skill: skill || null };
@@ -453,57 +464,73 @@ const TEMPLATES = {
       case 1: return {
         focus: a.name,
         tasks: [
-          t('SQL warm-up: 2 query drills', 20, 'coding', 'Keep the SQL muscle warm before the deep work.', 'sql'),
-          t(`Deep dive: ${a.name}`, 90, 'theory', a.theory, a.skill),
-          t('Turn notes into 10 flashcards', 20, 'writing', 'Spaced repetition beats re-reading. Cards you will actually review.', a.skill),
+          t('SQL warm-up: 3 query drills', 30, 'coding', 'Rotate the topic: windows, joins, aggregation, dedupe.', 'sql'),
+          t(`Deep dive: ${a.name}`, 120, 'theory', a.theory, a.skill),
+          t(`First pass at the lab: ${a.name}`, 90, 'lab', `Get the environment and the skeleton working. ${a.lab}`, a.skill),
+          t('Turn today into 10 flashcards', 30, 'writing', 'Spaced repetition beats re-reading. Cards you will actually review.', a.skill),
+          t('1 coding problem, timed', 30, 'coding', 'Python or SQL. 25 minutes on the clock, then read one better solution.', 'dsa'),
         ],
       };
       case 2: return {
-        focus: `${a.name} — hands on`,
+        focus: `${a.name} — build it`,
         tasks: [
-          t(`Lab: ${a.name}`, 120, 'lab', a.lab, a.skill),
-          t('Commit the lab with a short README', 20, 'project', 'Every lab lands in Git. Future-you and recruiters both read this.', 'devops'),
-          t('1 coding problem (easy/medium)', 30, 'coding', 'Python or SQL. Time it at 25 minutes, then read one better solution.', 'dsa'),
+          t('SQL warm-up: 2 drills', 20, 'coding', 'Short and sharp before the long block.', 'sql'),
+          t(`Lab: ${a.name}`, 150, 'lab', a.lab, a.skill),
+          t('Commit it: README, tests, clean history', 40, 'project', 'Every lab lands in Git. Future-you and recruiters both read this.', 'devops'),
+          t('2 coding problems, timed', 60, 'coding', 'One you can do, one that scares you.', 'dsa'),
+          t('Write a 150-word learning note', 30, 'writing', 'Explain it in your own words — this becomes blog and interview material.', 'behavioral'),
         ],
       };
       case 3: return {
         focus: b.name,
         tasks: [
-          t('SQL warm-up: 2 query drills', 20, 'coding', 'Rotate topic: windows, joins, aggregation, dedupe.', 'sql'),
-          t(`Deep dive: ${b.name}`, 90, 'theory', b.theory, b.skill),
-          t('Read the official docs section', 30, 'theory', 'Primary sources over tutorials. Note the three things that surprised you.', b.skill),
+          t('SQL warm-up: 3 query drills', 30, 'coding', 'Rotate the topic from Monday.', 'sql'),
+          t(`Deep dive: ${b.name}`, 120, 'theory', b.theory, b.skill),
+          t('Read the official docs section', 45, 'theory', 'Primary sources over tutorials. Note the three things that surprised you.', b.skill),
+          t(`First pass at the lab: ${b.name}`, 75, 'lab', b.lab, b.skill),
+          t('Flashcard review: this week so far', 30, 'writing', 'Review beats collection. Cards you fail go to the front.', null),
         ],
       };
       case 4: return {
-        focus: `${b.name} — hands on`,
+        focus: `${b.name} — build it`,
         tasks: [
-          t(`Lab: ${b.name}`, 120, 'lab', b.lab, b.skill),
-          t('Write a 150-word learning note', 20, 'writing', 'Explain today in your own words — this becomes blog and interview material.', 'behavioral'),
-          t('1 coding problem (medium)', 30, 'coding', 'Explain the approach out loud before you type.', 'dsa'),
+          t(`Lab: ${b.name}`, 150, 'lab', b.lab, b.skill),
+          t('Commit it: README, tests, clean history', 40, 'project', 'Tests included. A pipeline without tests is a demo.', 'devops'),
+          t('2 coding problems, timed', 60, 'coding', 'Explain the approach out loud before you type.', 'dsa'),
+          t('Write a 150-word learning note', 30, 'writing', 'What clicked, what is still fuzzy.', 'behavioral'),
+          t('Flashcard review', 20, 'writing', 'Ten minutes twice beats twenty minutes once.', null),
         ],
       };
       case 5: return {
         focus: 'Interview drills & weak-area review',
         tasks: [
-          t('SQL interview set: 2 problems', 45, 'coding', 'Timed, no autocomplete, no docs. Log every mistake.', 'sql'),
-          t('Python/DSA problem', 45, 'coding', 'Pattern practice — pick the pattern you are worst at.', 'dsa'),
-          t('Review the week: weak areas & mistakes log', 40, 'theory', 'Re-solve the two things you got wrong this week.', null),
+          t('SQL interview set: 4 problems, timed', 90, 'coding', 'No autocomplete, no docs. Log every mistake in the Vault.', 'sql'),
+          t('Python/DSA: 2 problems, timed', 60, 'coding', 'Pattern practice — pick the pattern you are worst at.', 'dsa'),
+          t('Re-solve this week\'s mistakes from scratch', 60, 'coding', 'Straight from the Vault mistakes log. This is the highest-value hour of the week.', null),
+          t('Concept reading: this week\'s gaps', 50, 'theory', 'Go back to whatever you nodded along to without really understanding.', null),
+          t('Consolidate the week\'s notes', 40, 'writing', 'Merge four days of notes into something you would actually re-read.', 'behavioral'),
         ],
       };
       case 6: return {
-        focus: 'Project build block',
+        focus: 'Project build day',
         tasks: [
-          t('Project deep work', 180, 'project', phase.project, null),
-          t('Push code + update project README', 30, 'project', 'A visible commit history is part of the portfolio.', 'devops'),
+          t('Project deep work — block 1', 180, 'project', phase.project, null),
+          t('Project deep work — block 2', 150, 'project', 'Second push. Aim to finish a slice you can demo, not a slice you can describe.', null),
+          t('Tests for what you built today', 60, 'project', 'Data tests and unit tests, not just a green run.', 'devops'),
+          t('Push + update the README and diagram', 45, 'project', 'A visible commit history is part of the portfolio.', 'devops'),
+          t('1 coding problem, timed', 45, 'coding', 'Keeps the interview reflexes alive on build days.', 'dsa'),
         ],
       };
       default: return {
-        focus: 'Retro, story bank & reset',
+        focus: 'Review, retro & the week ahead',
         tasks: [
-          t('Weekly retro & plan next week', 40, 'career', 'What moved, what slipped, what changes next week. Update your skill ratings.', null),
-          t('Behavioral: write 1 STAR story', 30, 'career', 'Situation, Task, Action, Result — from this week\'s real work.', 'behavioral'),
-          t('Networking: 2 meaningful touchpoints', 25, 'career', 'Comment, share a learning note, or message someone in data engineering.', 'behavioral'),
-          t('Light reading: newsletter, paper or talk', 30, 'theory', 'Breadth day. No laptop required.', null),
+          t('Weekly retro & plan next week', 45, 'career', 'What moved, what slipped, what changes. Update your skill ratings.', null),
+          t('Behavioral: write 1 STAR story', 45, 'career', 'From this week\'s real work. Numbers in the result. Straight into the Vault.', 'behavioral'),
+          t('Spaced repetition: the full week\'s cards', 45, 'theory', 'Everything from Monday onward, not just the recent ones.', null),
+          t('Re-read the week\'s notes and fill the gaps', 60, 'theory', 'Every "I\'ll come back to this" from the week — come back to it.', null),
+          t('Preview next week\'s topics', 120, 'theory', 'Skim the docs and one talk so Monday starts warm instead of cold.', null),
+          t('Project or lab catch-up', 120, 'project', 'Whatever slipped this week. If nothing slipped, push the project further.', null),
+          t('Networking: 2 meaningful touchpoints', 45, 'career', 'Share a learning note, comment substantively, or message someone in data engineering.', 'behavioral'),
         ],
       };
     }
@@ -512,37 +539,46 @@ const TEMPLATES = {
   build(dow, a, b, phase) {
     switch (dow) {
       case 1: return { focus: a.name, tasks: [
-        t(`Capstone sprint: ${a.name}`, 150, 'project', a.lab, a.skill),
-        t('Update architecture diagram & design notes', 30, 'writing', a.theory, 'systemdesign'),
-        t('SQL drill: 2 problems', 20, 'coding', 'Maintenance so nothing decays during build weeks.', 'sql'),
+        t(`Capstone sprint: ${a.name}`, 180, 'project', a.lab, a.skill),
+        t('Architecture diagram & design notes', 60, 'writing', a.theory, 'systemdesign'),
+        t('Tests for today\'s slice', 30, 'project', 'Written today, not "later".', 'devops'),
+        t('SQL drills: 2 problems', 30, 'coding', 'Maintenance so nothing decays during build weeks.', 'sql'),
       ]};
-      case 2: return { focus: `${a.name} — tests & hardening`, tasks: [
-        t(`Capstone sprint: ${a.name} (continue)`, 150, 'project', 'Finish the slice you started, then make it re-runnable.', a.skill),
-        t('Add tests for what you built', 30, 'project', 'Data tests and unit tests. A pipeline without tests is a demo.', 'devops'),
-        t('1 coding problem', 30, 'coding', 'Timed at 25 minutes.', 'dsa'),
+      case 2: return { focus: `${a.name} — finish the slice`, tasks: [
+        t(`Capstone sprint: ${a.name} (continue)`, 180, 'project', 'Finish what you started, then make it re-runnable from scratch.', a.skill),
+        t('Harden it: error handling, retries, idempotency', 60, 'project', 'The difference between a demo and a pipeline.', 'pipelines'),
+        t('2 coding problems, timed', 60, 'coding', 'Interview maintenance.', 'dsa'),
       ]};
       case 3: return { focus: b.name, tasks: [
-        t(`Capstone sprint: ${b.name}`, 150, 'project', b.lab, b.skill),
-        t('Documentation pass', 30, 'writing', b.theory, 'behavioral'),
+        t(`Capstone sprint: ${b.name}`, 180, 'project', b.lab, b.skill),
+        t('Documentation pass', 60, 'writing', b.theory, 'behavioral'),
+        t('2 coding problems, timed', 60, 'coding', 'Keep the clock on.', 'dsa'),
       ]};
       case 4: return { focus: `${b.name} — ship it`, tasks: [
-        t(`Capstone sprint: ${b.name} (continue)`, 150, 'project', 'Close the loop: deployed, scheduled, monitored.', b.skill),
-        t('CI/CD & deployment check', 30, 'project', 'Green build, automated deploy, secrets out of code.', 'devops'),
-        t('1 coding problem', 30, 'coding', 'Keep the interview reflexes alive.', 'dsa'),
+        t(`Capstone sprint: ${b.name} (continue)`, 180, 'project', 'Close the loop: deployed, scheduled, monitored.', b.skill),
+        t('CI/CD & deployment check', 60, 'project', 'Green build, automated deploy, secrets out of the code.', 'devops'),
+        t('2 coding problems, timed', 60, 'coding', 'Interview maintenance.', 'dsa'),
       ]};
       case 5: return { focus: 'System design & interview maintenance', tasks: [
-        t('Data system design case (timed 45 min)', 60, 'theory', 'Requirements, volume estimate, architecture, tradeoffs, failure modes, cost.', 'systemdesign'),
-        t('SQL interview set: 2 problems', 45, 'coding', 'Timed, no help.', 'sql'),
-        t('Blockers retro', 20, 'writing', 'What is actually blocking the capstone? Fix the process, not just the code.', null),
+        t('Data system design case, timed', 90, 'theory', 'Requirements, volume estimate, architecture, tradeoffs, failure modes, cost.', 'systemdesign'),
+        t('SQL interview set: 3 problems', 60, 'coding', 'Timed, no help.', 'sql'),
+        t('Re-solve this week\'s mistakes', 60, 'coding', 'From the Vault. From scratch.', null),
+        t('Blockers retro', 30, 'writing', 'What is actually blocking the capstone? Fix the process, not just the code.', null),
+        t('Reading: the gap the design case exposed', 60, 'theory', 'Every case reveals something you half-know. Close it now.', 'systemdesign'),
       ]};
       case 6: return { focus: 'Milestone deep work', tasks: [
-        t('Deep work: close out this week\'s deliverable', 180, 'project', phase.milestone, null),
-        t('Demo recording or screenshots', 30, 'project', 'Proof that it runs beats a description that it runs.', 'behavioral'),
+        t('Deep work: this week\'s deliverable', 240, 'project', phase.milestone, null),
+        t('Demo recording or screenshots', 60, 'project', 'Proof that it runs beats a description that it runs.', 'behavioral'),
+        t('Write-up: problem → approach → tradeoffs → result', 90, 'writing', 'With numbers. This is the portfolio piece, not the code.', 'behavioral'),
+        t('2 coding problems, timed', 90, 'coding', 'Long day, but the drills do not skip.', 'dsa'),
       ]};
-      default: return { focus: 'Retro, write-up & reset', tasks: [
-        t('Weekly retro & plan next week', 40, 'career', 'Update skill ratings and the capstone burndown.', null),
-        t('Write the project blog section', 45, 'writing', 'Problem → approach → tradeoffs → result, with numbers.', 'behavioral'),
-        t('Networking: 2 touchpoints', 25, 'career', 'Share the week\'s progress publicly.', 'behavioral'),
+      default: return { focus: 'Retro, write-up & the week ahead', tasks: [
+        t('Weekly retro & plan next week', 45, 'career', 'Update skill ratings and the capstone burndown on the Board.', null),
+        t('Write the project blog section', 90, 'writing', 'Problem → approach → tradeoffs → result, with numbers.', 'behavioral'),
+        t('Portfolio polish: README, diagrams, cost notes', 90, 'project', 'A hiring manager should get it in five minutes.', 'behavioral'),
+        t('Networking: 2 touchpoints', 45, 'career', 'Share the week\'s progress publicly.', 'behavioral'),
+        t('Preview next week\'s capstone slice', 90, 'theory', 'Read ahead so Monday is building, not researching.', null),
+        t('Catch-up block', 120, 'project', 'Whatever slipped. If nothing slipped, pull work forward.', null),
       ]};
     }
   },
@@ -550,37 +586,52 @@ const TEMPLATES = {
   interview(dow, a, b) {
     switch (dow) {
       case 1: return { focus: `DSA: ${a.name}`, tasks: [
-        t(`DSA set: 3 problems — ${a.name}`, 90, 'coding', a.theory, a.skill),
-        t('SQL drill set: 3 problems', 30, 'coding', 'Timed 10 minutes each.', 'sql'),
-        t('Review the mistakes log', 20, 'theory', 'Re-solve one problem you failed last week.', null),
+        t(`DSA set: 4 problems — ${a.name}`, 120, 'coding', a.theory, a.skill),
+        t('SQL drill set: 4 problems', 60, 'coding', 'Timed at 12 minutes each.', 'sql'),
+        t('Re-solve last week\'s misses', 60, 'coding', 'From the Vault mistakes log, from scratch, no notes.', null),
+        t('Azure/Spark rapid-fire: 25 cards', 60, 'coding', 'Spoken answers, under 45 seconds each.', 'azure'),
       ]};
       case 2: return { focus: 'System design', tasks: [
-        t('Data system design: 1 timed case (45 min)', 60, 'theory', 'Design a pipeline end to end and defend the tradeoffs.', 'systemdesign'),
-        t('Write the design doc & self-grade', 30, 'writing', 'Grade against a rubric: requirements, scale, storage, processing, failure, cost.', 'systemdesign'),
-        t('Azure/Spark rapid-fire: 20 cards', 30, 'coding', 'Spoken answers, under 45 seconds each.', 'azure'),
+        t('Data system design: 1 timed case', 90, 'theory', 'Design a pipeline end to end and defend every tradeoff out loud.', 'systemdesign'),
+        t('Write the design doc & self-grade', 45, 'writing', 'Grade against a rubric: requirements, scale, storage, processing, failure, cost.', 'systemdesign'),
+        t('Close the gap the case exposed', 45, 'theory', 'Read properly about the thing you hand-waved.', 'systemdesign'),
+        t('DSA: 2 problems, timed', 75, 'coding', 'Medium and hard.', 'dsa'),
+        t('Behavioral: rehearse 1 STAR story', 45, 'career', 'Two minutes, out loud, no script in front of you.', 'behavioral'),
       ]};
       case 3: return { focus: `DSA & SQL: ${b.name}`, tasks: [
-        t(`DSA set: 3 problems — ${b.name}`, 90, 'coding', b.theory, b.skill),
-        t('SQL interview set: 3 problems', 45, 'coding', 'Hard set: window functions, gaps and islands, funnels.', 'sql'),
+        t(`DSA set: 4 problems — ${b.name}`, 120, 'coding', b.theory, b.skill),
+        t('SQL interview set: 4 hard problems', 90, 'coding', 'Window functions, gaps and islands, funnels, dedupe.', 'sql'),
+        t('Re-solve from the mistakes log', 60, 'coding', 'The ones you have now failed twice go to the top.', null),
+        t('Flashcard review', 30, 'theory', 'Azure, Spark, Delta, modeling — spoken, not read.', null),
       ]};
       case 4: return { focus: 'Mock interview day', tasks: [
-        t('Mock interview: technical round (60 min)', 60, 'coding', 'Peer, mentor or AI interviewer. Camera on, think out loud.', null),
-        t('Feedback notes & fix list', 30, 'writing', 'Three concrete fixes before the next mock.', null),
-        t('Behavioral: rehearse 2 STAR stories', 30, 'career', 'Two minutes each, out loud, no script in front of you.', 'behavioral'),
+        t('Mock interview: technical round', 75, 'coding', 'Peer, mentor or AI interviewer. Camera on, think out loud, keep to time.', null),
+        t('Log it in the Vault: score, feedback, three fixes', 45, 'writing', 'Feedback is only useful if it changes the next session.', null),
+        t('Work the three fixes', 60, 'coding', 'Immediately, while it still stings.', null),
+        t('DSA: 2 problems, timed', 75, 'coding', 'Back on the horse.', 'dsa'),
+        t('Behavioral: rehearse 2 STAR stories', 45, 'career', 'Record them. Cut each to two minutes.', 'behavioral'),
       ]};
       case 5: return { focus: 'Modeling case & positioning', tasks: [
-        t('Data modeling case (timed)', 60, 'theory', 'Grain, dimensions, metrics, history, late-arriving data.', 'modeling'),
-        t('Resume / portfolio iteration', 30, 'career', 'One section, rewritten against a real job description.', 'behavioral'),
-        t('Company research: Microsoft data orgs', 30, 'career', 'Teams, products, the stack they publish about, open reqs.', 'behavioral'),
+        t('Data modeling case, timed', 75, 'theory', 'Grain, dimensions, metrics, history, late-arriving data.', 'modeling'),
+        t('SQL interview set: 3 problems', 60, 'coding', 'Timed.', 'sql'),
+        t('Resume / portfolio iteration', 45, 'career', 'One section, rewritten against a real job description.', 'behavioral'),
+        t('Company research: Microsoft data orgs', 60, 'career', 'Teams, products, the stack they publish about, open reqs. Log the good ones in Apply.', 'behavioral'),
+        t('Story bank: polish 1 story', 60, 'career', 'Tighten it, add the numbers, say it out loud.', 'behavioral'),
       ]};
       case 6: return { focus: 'Full loop simulation', tasks: [
-        t('Simulated loop: 2 back-to-back rounds', 150, 'coding', 'Coding + design, with a 10-minute break between. Time pressure is the point.', null),
-        t('Post-mortem notes', 30, 'writing', 'Where did you stall? What phrase did you fumble?', null),
+        t('Simulated loop: 3 back-to-back rounds', 240, 'coding', 'Coding, design, behavioral, ten-minute breaks between. The fatigue is the point.', null),
+        t('Post-mortem: where did you stall?', 60, 'writing', 'Question by question. Into the Vault.', null),
+        t('Work the biggest gap', 90, 'coding', 'The single thing that would have failed you today.', null),
+        t('2 coding problems, timed', 90, 'coding', 'Finish tired. That is the skill.', 'dsa'),
       ]};
       default: return { focus: 'Retro, stories & outreach', tasks: [
-        t('Weekly retro & plan next week', 40, 'career', 'Track mock scores week over week.', null),
-        t('Polish the story bank', 30, 'career', 'Tighten two STAR stories; add numbers.', 'behavioral'),
-        t('Networking & referral outreach', 40, 'career', 'Three messages. Referrals move applications more than anything else.', 'behavioral'),
+        t('Weekly retro & plan next week', 45, 'career', 'Track mock scores week over week in the Vault.', null),
+        t('Polish the story bank', 60, 'career', 'Tighten two stories; add numbers to both.', 'behavioral'),
+        t('Networking & referral outreach', 60, 'career', 'Three messages. Referrals move applications more than anything else.', 'behavioral'),
+        t('Drill your weakest area', 120, 'coding', 'Whatever the mock scores say. Not the thing you enjoy.', null),
+        t('Design case, timed', 90, 'theory', 'One more, spoken out loud, self-graded.', 'systemdesign'),
+        t('Plan the week\'s mocks and applications', 60, 'career', 'Book them now or they will not happen.', 'behavioral'),
+        t('Light reading: engineering blogs', 45, 'theory', 'Breadth. How real teams actually built it.', null),
       ]};
     }
   },
@@ -588,38 +639,53 @@ const TEMPLATES = {
   apply(dow) {
     switch (dow) {
       case 1: return { focus: 'Application block', tasks: [
-        t('Apply: 3 targeted roles', 60, 'career', 'Microsoft data engineering reqs plus two strong backups.', 'behavioral'),
-        t('Tailor resume bullets per role', 40, 'career', 'Mirror the req language where it is honestly true.', 'behavioral'),
-        t('DSA maintenance: 2 problems', 40, 'coding', 'Keep sharp while the pipeline runs.', 'dsa'),
+        t('Apply: 3 targeted roles', 90, 'career', 'Microsoft data engineering reqs plus two strong backups. Log each in Apply.', 'behavioral'),
+        t('Tailor resume bullets per role', 60, 'career', 'Mirror the req language wherever it is honestly true.', 'behavioral'),
+        t('DSA maintenance: 2 problems', 60, 'coding', 'Keep sharp while the pipeline runs.', 'dsa'),
+        t('System design refresh case', 60, 'theory', 'One case, timed, out loud.', 'systemdesign'),
+        t('Follow up on pending applications', 30, 'career', 'A polite nudge after 7–10 days is normal and it works.', 'behavioral'),
       ]};
       case 2: return { focus: 'Referrals & screens', tasks: [
-        t('Referral outreach: 3 messages', 40, 'career', 'Personalised, short, with a specific ask.', 'behavioral'),
-        t('Recruiter screen prep', 40, 'career', 'The 90-second pitch, your numbers, your timeline.', 'behavioral'),
-        t('SQL drills: 3 problems', 30, 'coding', 'Timed.', 'sql'),
+        t('Referral outreach: 3 messages', 60, 'career', 'Personalised, short, with a specific ask.', 'behavioral'),
+        t('Recruiter screen prep', 60, 'career', 'The 90-second pitch, your numbers, your timeline, your comp range.', 'behavioral'),
+        t('SQL drills: 4 problems', 60, 'coding', 'Timed.', 'sql'),
+        t('Mock interview prep or session', 60, 'coding', 'Whatever round is closest on the calendar.', null),
+        t('Reading: the stack of the team you are targeting', 60, 'theory', 'Their engineering blog, their docs, their open source.', 'azure'),
       ]};
-      case 3: return { focus: 'Applications & design refresh', tasks: [
-        t('Apply: 3 targeted roles', 60, 'career', 'Log every application with date, req ID and contact.', 'behavioral'),
-        t('System design refresh case', 45, 'theory', 'One case, timed, spoken out loud.', 'systemdesign'),
-        t('Follow up on pending applications', 20, 'career', 'A polite nudge after 7-10 days is normal and works.', 'behavioral'),
+      case 3: return { focus: 'Applications & design', tasks: [
+        t('Apply: 3 targeted roles', 90, 'career', 'Log date, req ID and contact for every one.', 'behavioral'),
+        t('System design case, timed', 75, 'theory', 'Spoken out loud, self-graded against the rubric.', 'systemdesign'),
+        t('Follow-ups and thank-you notes', 45, 'career', 'Same day, every time.', 'behavioral'),
+        t('DSA: 2 problems, timed', 60, 'coding', 'Maintenance.', 'dsa'),
+        t('Update the interview tracker', 30, 'career', 'Every conversation, every name, every next step.', null),
       ]};
       case 4: return { focus: 'Mock & rehearsal', tasks: [
-        t('Mock interview: technical', 60, 'coding', 'Whatever round is closest on the calendar.', null),
-        t('Behavioral rehearsal', 30, 'career', 'Two stories, two minutes each.', 'behavioral'),
-        t('Azure/Spark rapid-fire', 30, 'coding', 'Depth answers without notes.', 'azure'),
+        t('Mock interview: technical', 75, 'coding', 'Whatever round is closest on the calendar.', null),
+        t('Log it and work the fixes', 60, 'writing', 'Score, feedback, three fixes, into the Vault.', null),
+        t('Azure/Spark rapid-fire', 45, 'coding', 'Depth answers without notes.', 'azure'),
+        t('DSA: 2 problems, timed', 60, 'coding', 'Maintenance.', 'dsa'),
+        t('Behavioral rehearsal', 60, 'career', 'Three stories, two minutes each, recorded.', 'behavioral'),
       ]};
       case 5: return { focus: 'Debrief & gap patching', tasks: [
-        t('Debrief & update the interview tracker', 40, 'career', 'Every round: questions asked, what went well, what did not.', null),
-        t('DSA maintenance: 2 problems', 40, 'coding', 'Timed.', 'dsa'),
-        t('Patch the top gap from feedback', 40, 'theory', 'Feedback is only useful if it changes the next session.', null),
+        t('Debrief every live round this week', 60, 'career', 'Questions asked, what went well, what did not. Write it down while it is fresh.', null),
+        t('DSA: 2 problems, timed', 60, 'coding', 'Maintenance.', 'dsa'),
+        t('Patch the top gap from feedback', 90, 'theory', 'Feedback is only useful if it changes the next round.', null),
+        t('Portfolio or blog update', 45, 'project', 'Keep the public record fresh while interviewing.', 'behavioral'),
+        t('Networking: 2 touchpoints', 45, 'career', 'Keep the warm network warm.', 'behavioral'),
       ]};
       case 6: return { focus: 'Loop simulation or deep patch', tasks: [
-        t('Full loop simulation or deep skill patch', 150, 'coding', 'Whichever the last debrief says you need more.', null),
-        t('Portfolio or blog update', 30, 'project', 'Keep the public record fresh while interviewing.', 'behavioral'),
+        t('Full loop simulation, or deep skill patch', 240, 'coding', 'Whichever the last debrief says you need more.', null),
+        t('Portfolio or blog update', 90, 'project', 'One solid piece beats five thin ones.', 'behavioral'),
+        t('Drill the weakest round type', 90, 'coding', 'The one you would fail tomorrow.', null),
+        t('Review the week\'s pipeline', 60, 'career', 'Applications out, responses in, conversion rate. What needs changing?', null),
       ]};
-      default: return { focus: 'Retro & reset', tasks: [
-        t('Weekly retro & plan next week', 40, 'career', 'Applications out, responses in, conversion rate.', null),
-        t('Networking: 3 touchpoints', 30, 'career', 'Keep the warm network warm.', 'behavioral'),
-        t('Rest & reset', 30, 'career', 'A rested candidate interviews better. This is a real task.', null),
+      default: return { focus: 'Reset & the week ahead', tasks: [
+        t('Weekly retro & plan next week', 45, 'career', 'Applications out, responses in, conversion rate.', null),
+        t('Networking: 3 touchpoints', 60, 'career', 'Referrals still move more than applications do.', 'behavioral'),
+        t('Story bank polish', 60, 'career', 'The stories you will actually be asked for.', 'behavioral'),
+        t('Study the weakest area', 150, 'theory', 'The gap your debriefs keep naming.', null),
+        t('Prep the week\'s interviews', 90, 'career', 'Company research, questions to ask, logistics.', 'behavioral'),
+        t('Portfolio or blog update', 75, 'project', 'Momentum is visible to the people reading your profile.', 'behavioral'),
       ]};
     }
   },
