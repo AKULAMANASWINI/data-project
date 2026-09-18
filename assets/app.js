@@ -75,13 +75,16 @@ let activeView = 'today';
 
 function loadStateFrom(parsed) {
   const blank = {
-    v: 1, days: {}, skills: {}, board: [], boardSeeded: false,
+    v: 1, resetToken: PLAN.resetToken, days: {}, skills: {}, board: [], boardSeeded: false,
     stories: [], mistakes: [], mocks: [], apps: [], theme: 'auto',
   };
   const list = (v) => (Array.isArray(v) ? v : []);
   return {
     ...blank,
     ...parsed,
+    // Always stamped with the current token, so an imported backup is not wiped on reload.
+    resetToken: PLAN.resetToken,
+    theme: parsed.theme || 'auto',
     days: parsed.days || {},
     skills: parsed.skills || {},
     board: list(parsed.board),
@@ -95,7 +98,14 @@ function loadStateFrom(parsed) {
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return loadStateFrom(raw ? JSON.parse(raw) : {});
+    const parsed = raw ? JSON.parse(raw) : {};
+    // A new reset token means the plan was restarted: keep the theme, drop the rest.
+    if (parsed.resetToken !== PLAN.resetToken) {
+      const fresh = loadStateFrom({ theme: parsed.theme });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+      return fresh;
+    }
+    return loadStateFrom(parsed);
   } catch {
     return loadStateFrom({});
   }
@@ -555,8 +565,12 @@ function heatmap() {
       if (color) cell.style.background = color;
       if (dateStr === todayISO()) cell.classList.add('is-today');
       if (daysBetween(new Date(), parseISO(dateStr)) > 0) cell.classList.add('is-future');
-      cell.setAttribute('aria-label', `${dateStr}: ${Math.round(ratio * 100)}% complete`);
-      const tip = `<strong>${fmtLong(parseISO(dateStr))}</strong><br>${plan.focus}<br>${Math.round(ratio * 100)}% of ${hours(plan.totalMinutes)}h${complete ? ' · complete' : ''}`;
+      const beforeStart = daysBetween(START, parseISO(dateStr)) < 0;
+      if (beforeStart) cell.classList.add('is-before');
+      cell.setAttribute('aria-label', beforeStart ? `${dateStr}: before the plan started` : `${dateStr}: ${Math.round(ratio * 100)}% complete`);
+      const tip = beforeStart
+        ? `<strong>${fmtLong(parseISO(dateStr))}</strong><br>Before the plan started`
+        : `<strong>${fmtLong(parseISO(dateStr))}</strong><br>${plan.focus}<br>${Math.round(ratio * 100)}% of ${hours(plan.totalMinutes)}h${complete ? ' · complete' : ''}`;
       cell.onmousemove = (e) => showTip(e, tip);
       cell.onmouseleave = hideTip;
       cell.onclick = () => { hideTip(); selectedDate = dateStr; setView('today'); };

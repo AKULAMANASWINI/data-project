@@ -4,7 +4,7 @@ A single-page site that turns "get a data engineering job at Microsoft after Dec
 schedule you can actually follow: every day already has a plan, you tick blocks off as you do
 them, and progress accumulates into a streak, a heatmap and a skill matrix.
 
-Start date **16 Sep 2026** · target **1 Dec 2027** — 63 weeks, split into 7 phases.
+Start date **18 Sep 2026** · target **1 Dec 2027** — 63 weeks, split into 7 phases.
 
 ## Run it
 
@@ -81,6 +81,11 @@ it is still there months later when you need to revise from it.
 In `localStorage`, in the browser you use — it never leaves your machine, and it does not sync
 between devices or browsers. **Export a backup from the Data tab at the end of each month**, and
 import it after switching browsers.
+
+To restart the plan from scratch, change `startDate` in `assets/roadmap.js` and bump
+`resetToken` alongside it. Every browser clears its stored progress once on the next load, so
+the restart applies everywhere rather than only where you clicked Reset. Imported backups are
+re-stamped with the current token, so restoring one does not trip the wipe.
 
 ## Files
 
