@@ -42,15 +42,21 @@ Nothing is hardcoded per date. `assets/roadmap.js` defines phases; each phase ho
 topics with a *theory* and a *lab* description. `assets/app.js` works out which phase and week a
 date falls in, picks two topics for that week, and fills a fixed weekly shape:
 
-| Day | Shape |
-|---|---|
-| Mon | SQL warm-up → topic A deep dive → flashcards |
-| Tue | Topic A hands-on lab → commit it → 1 coding problem |
-| Wed | SQL warm-up → topic B deep dive → primary docs |
-| Thu | Topic B lab → written learning note → 1 coding problem |
-| Fri | Timed SQL set + DSA problem + weak-area review |
-| Sat | 3-hour project block on the phase project |
-| Sun | Retro, a STAR story, networking, light reading |
+**Time budget: 5 hours a day Mon–Fri, 8 hours Sat–Sun — 41 hours a week.** Every generated day
+sums to exactly its budget.
+
+| Day | Shape | Budget |
+|---|---|---|
+| Mon | SQL warm-up → topic A deep dive → first pass at the lab → flashcards → 1 timed problem | 5h |
+| Tue | SQL warm-up → topic A lab → commit with tests → 2 timed problems → learning note | 5h |
+| Wed | SQL warm-up → topic B deep dive → primary docs → first pass at the lab → flashcards | 5h |
+| Thu | Topic B lab → commit with tests → 2 timed problems → learning note → flashcards | 5h |
+| Fri | Timed SQL set → DSA set → re-solve the week's mistakes → gap reading → consolidate notes | 5h |
+| Sat | Two project blocks → tests → push and document → 1 timed problem | 8h |
+| Sun | Retro → STAR story → spaced repetition → fill the week's gaps → preview next week → catch-up → networking | 8h |
+
+To change the budget, edit the templates in `assets/roadmap.js`; `WEEKDAY_MINUTES` and
+`WEEKEND_MINUTES` at the top of that section document what each day must sum to.
 
 Later phases swap that shape for project sprints, then interview drills, then applications.
 Weeks are anchored to Mondays, so every phase starts on a Monday and ends with a Sunday retro.
