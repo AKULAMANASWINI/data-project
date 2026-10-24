@@ -416,7 +416,7 @@ function renderRoadmap() {
   const root = $('#view-roadmap');
   root.innerHTML = '';
   const intro = el('div', 'card');
-  intro.append(el('h2', null, 'The 15-month route'));
+  intro.append(el('h2', null, 'The route'));
   intro.append(el('p', 'muted', `From ${fmtLong(START)} to ${PLAN.targetLabel} by ${fmtShort(TARGET)} ${TARGET.getFullYear()}. Each phase stacks on the one before it; the weekly shape stays the same so the habit never resets.`));
   root.append(intro);
 
