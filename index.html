@@ -6,7 +6,7 @@
 <title>Data Engineering @ Microsoft — Career Tracker</title>
 <meta name="description" content="Daily plan, daily schedule and progress tracking on the route to a data engineering role at Microsoft.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📊</text></svg>">
-<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/styles.css?v=20261024">
 </head>
 <body>
   <header class="topbar">
@@ -73,7 +73,9 @@
   <div id="tooltip" class="tooltip" hidden role="status"></div>
   <div id="toast" class="toast" hidden role="status"></div>
 
-  <script src="assets/roadmap.js"></script>
-  <script src="assets/app.js"></script>
+  <!-- ?v= is a cache buster: bump it in all three URLs whenever assets change,
+       or browsers keep serving the previous build for up to GitHub Pages' cache window. -->
+  <script src="assets/roadmap.js?v=20261024"></script>
+  <script src="assets/app.js?v=20261024"></script>
 </body>
 </html>

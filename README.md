@@ -101,3 +101,9 @@ assets/styles.css   styling, light/dark themes, chart CSS
 assets/roadmap.js   the curriculum: phases, topics, skills, daily templates
 assets/app.js       state, plan generation, views, charts
 ```
+
+## Shipping a change
+
+`index.html` loads the assets with a `?v=` query string. Bump it in all three URLs whenever
+`assets/` changes, otherwise browsers keep serving the previous build until their cache expires
+and the site looks unchanged after a deploy.
