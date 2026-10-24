@@ -8,13 +8,13 @@
  */
 
 const PLAN = {
-  startDate: '2026-10-01',
-  anchorMonday: '2026-09-28',
-  targetDate: '2027-12-01',
+  startDate: '2026-10-24',
+  anchorMonday: '2026-10-19',
+  targetDate: '2028-01-24',
   targetLabel: 'Microsoft Data Engineer — interview-ready',
 
   // Bumping this wipes stored progress on next load, for a clean restart.
-  resetToken: '2026-10-01-fresh-start',
+  resetToken: '2026-10-24-fresh-start',
 
   levels: ['Not started', 'Aware', 'Beginner', 'Working', 'Proficient', 'Interview-ready'],
 

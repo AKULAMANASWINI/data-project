@@ -4,7 +4,7 @@ A single-page site that turns "get a data engineering job at Microsoft after Dec
 schedule you can actually follow: every day already has a plan, you tick blocks off as you do
 them, and progress accumulates into a streak, a heatmap and a skill matrix.
 
-Start date **1 Oct 2026** · target **1 Dec 2027** — 61 weeks, split into 7 phases.
+Start date **24 Oct 2026** · target **24 Jan 2028** — 66 weeks, split into 7 phases.
 
 ## Run it
 
